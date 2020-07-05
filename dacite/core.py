@@ -1,5 +1,6 @@
 import copy
 from dataclasses import is_dataclass
+from functools import lru_cache
 from typing import TypeVar, Type, Optional, get_type_hints, Mapping, Any
 
 from dacite.config import Config
@@ -28,6 +29,16 @@ from dacite.types import (
 T = TypeVar("T")
 
 
+@lru_cache(maxsize=None)
+def _get_type_hints_cache(data_class, globalns) -> T:
+    return get_type_hints(data_class, globalns)
+
+
+@lru_cache(maxsize=None)
+def _get_fields_cache(data_class) -> T:
+    return get_fields(data_class)
+
+
 def from_dict(data_class: Type[T], data: Data, config: Optional[Config] = None) -> T:
     """Create a data class instance from a dictionary.
 
@@ -40,10 +51,10 @@ def from_dict(data_class: Type[T], data: Data, config: Optional[Config] = None) 
     post_init_values: Data = {}
     config = config or Config()
     try:
-        data_class_hints = get_type_hints(data_class, globalns=config.forward_references)
+        data_class_hints = _get_type_hints_cache(data_class, globalns=config.forward_references)
     except NameError as error:
         raise ForwardReferenceError(str(error))
-    data_class_fields = get_fields(data_class)
+    data_class_fields = _get_fields_cache(data_class)
     if config.strict:
         extra_fields = set(data.keys()) - {f.name for f in data_class_fields}
         if extra_fields:
